@@ -4,8 +4,14 @@ import argparse
 import re
 
 def extract_final_amount(memo_field):
-    amounts = memo_field.apply(lambda x: re.findall(r'Final amount: £([0-9]+(?:\.[0-9]+)?)', x))
-    return amounts.apply(lambda lst: max([float(amt) for amt in lst if amt], default=0.0)).astype(float)
+    # Extract amounts and take the maximum value directly within the aggregation step
+    max_value = 0.0
+    for memo in memo_field:
+        amounts = re.findall(r'Final amount: £([0-9]+(?:\.[0-9]+)?)', memo)
+        if amounts:
+            current_max = max(float(amt) for amt in amounts)
+            max_value = max(max_value, current_max)
+    return max_value
 
 def process_invoice(file_path):
     df = pd.read_csv(file_path, skiprows=5)
@@ -26,6 +32,9 @@ def process_invoice(file_path):
     grouped['Item Cost'] = 0.00 #placeholder
     grouped['Profit'] = grouped['Total Sale Price'] - grouped['Total Fees'] - grouped['Shipping Cost'] - grouped['Item Cost']
     
+
+    monetary_columns = ['Total Sale Price', 'Total Fees', 'Total VAT Charged', 'Shipping Cost', 'Item Cost', 'Profit']
+    grouped[monetary_columns] = grouped[monetary_columns].round(2)
     return grouped
 
 def process_all_invoices(directory, start_date, end_date):
